@@ -23,7 +23,6 @@
       margin: 0;
       padding: 0;
       text-align: center;
-      overflow: hidden; /* Evita barras de desplazamiento */
     }
 
     /* Contenedor centrado vertical y horizontalmente */
@@ -35,11 +34,12 @@
       justify-content: center;
     }
 
-    /* Banner superior para los logos (opcional) */
+    /* Banner superior para los logos */
     #banner {
       width: 100%;
       background-color: #1a1a1a;
       padding: 10px 0;
+      /* Animación de entrada */
       animation: fadeInDown 1s ease-out;
     }
 
@@ -52,7 +52,6 @@
         opacity: 0;
         transform: translateY(-50px);
       }
-
       to {
         opacity: 1;
         transform: translateY(0);
@@ -77,14 +76,7 @@
       font-weight: bold;
     }
 
-    /* Estilo para la clasificación del líquido */
-    h3 {
-      font-size: 1.5rem;
-      color: #fff;
-      margin-top: 15px;
-    }
-
-    /* Animación de carga personalizada (para SweetAlert2) */
+    /* Animación de carga personalizada (se usa dentro del modal de SweetAlert2) */
     .loader {
       border: 5px solid rgba(255, 255, 255, 0.2);
       border-left-color: #fff;
@@ -93,29 +85,25 @@
       height: 80px;
       animation: spin 0.5s linear infinite;
       margin: 0 auto;
-      display: none;
     }
 
     @keyframes spin {
       0% {
         transform: rotate(0deg);
       }
-
       100% {
         transform: rotate(360deg);
       }
     }
 
-    /* Animación para actualización del valor de pH */
+    /* Animación para actualización */
     @keyframes pulse {
       0% {
         transform: scale(1);
       }
-
       50% {
         transform: scale(1.1);
       }
-
       100% {
         transform: scale(1);
       }
@@ -125,10 +113,37 @@
       animation: pulse 0.5s ease-in-out;
     }
 
-    /* Oculta scrollbar */
+    /* Animación de peligro: vibración */
+    .danger-animation {
+      animation: dangerShake 0.5s ease-in-out infinite;
+    }
+
+    @keyframes dangerShake {
+      0% {
+        transform: translateX(0);
+      }
+      25% {
+        transform: translateX(-5px);
+      }
+      50% {
+        transform: translateX(5px);
+      }
+      75% {
+        transform: translateX(-5px);
+      }
+      100% {
+        transform: translateX(0);
+      }
+    }
+
+    /* Ocultar scrollbar */
     body::-webkit-scrollbar {
       width: 0;
       background: transparent;
+    }
+
+    body {
+      scrollbar-width: none;
     }
   </style>
 </head>
@@ -136,7 +151,7 @@
 <body>
   <!-- Contenedor principal -->
   <div id="mainContent" class="container" style="display: none;">
-    <!-- Banner opcional para logos -->
+    <!-- Banner con logos -->
     <div id="banner" class="d-flex justify-content-around align-items-center mb-4">
       <img src="favicon.png" alt="Logo 1" class="logo img-fluid">
       <img src="logopanteras.png" alt="Logo 2" class="logo img-fluid">
@@ -146,10 +161,8 @@
       <h1 class="mb-4">Medidor de pH</h1>
       <div class="card">
         <div class="card-body">
-          <!-- Se muestra el valor de pH en tiempo real -->
+          <!-- Aquí se mostrará el valor de pH en tiempo real -->
           <h2 id="phValue" class="display-4">Cargando...</h2>
-          <!-- Se muestra la clasificación del líquido debajo del pH -->
-          <h3 id="liquidType">Sin datos</h3>
         </div>
       </div>
     </div>
@@ -162,20 +175,17 @@
 
   <script>
     // Al cargarse el contenido, muestra el modal de carga de SweetAlert2
-    document.addEventListener("DOMContentLoaded", function() {
+    document.addEventListener("DOMContentLoaded", function () {
       Swal.fire({
-        didOpen: () => {
-          document.body.style.overflow = "hidden"; // Oculta scrollbar
-        },
-        title: 'CARGANDO DATOS...',
-        html: '<div class="loader" style="display:block;"></div>',
+        title: 'Cargando datos...',
+        html: '<div class="loader"></div>',
         allowOutsideClick: false,
         showConfirmButton: false,
         background: '#000',
         color: '#fff',
         timer: 2000,
         didClose: () => {
-          document.body.style.overflow = ""; // Restaura scrollbar
+          // Al cerrar la animación de carga se muestra el contenedor principal
           document.getElementById("mainContent").style.display = "flex";
         }
       });
@@ -207,24 +217,35 @@
     // Obtiene una referencia al servicio de Realtime Database
     const database = firebase.database();
 
-    // Referencia a la ruta donde se almacena el pH
+    // Referencia a la ruta donde se almacena el pH (ajusta la ruta si es necesario)
     const phRef = database.ref('/Sensores/ph');
-
-    // Referencia a la ruta donde se almacena la clasificación del líquido
-    const liquidRef = database.ref('/Sensores/liquido');
 
     // Escucha cambios en tiempo real y actualiza el contenido del elemento con id "phValue"
     phRef.on('value', (snapshot) => {
       const ph = snapshot.val();
-      document.getElementById('phValue').innerText = (ph !== null) ? ph : "Sin datos";
-    });
+      const phElement = document.getElementById('phValue');
+      // Definir rango seguro: entre 6.5 y 8.5 (puedes ajustar estos valores)
+      const safeMin = 6.5,
+        safeMax = 8.5;
 
-    // Escucha cambios en tiempo real y actualiza el contenido del elemento con id "liquidType"
-    liquidRef.on('value', (snapshot) => {
-      const liquid = snapshot.val();
-      document.getElementById('liquidType').innerText = (liquid !== null) ? liquid : "Sin datos";
+      if (ph !== null) {
+        if (ph < safeMin || ph > safeMax) {
+          // Agua contaminada, se muestra el mensaje de peligro
+          phElement.innerText = `⚠️ ${ph} - Peligro: Agua contaminada`;
+          phElement.style.color = "#ff0000";
+          phElement.classList.add("danger-animation");
+        } else {
+          // Agua dentro del rango seguro
+          phElement.innerText = ph;
+          phElement.style.color = "#fff";
+          phElement.classList.remove("danger-animation");
+        }
+      } else {
+        phElement.innerText = "Sin datos";
+      }
     });
   </script>
 </body>
 
 </html>
+
