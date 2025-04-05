@@ -39,7 +39,6 @@
       width: 100%;
       background-color: #1a1a1a;
       padding: 10px 0;
-      /* Animación de entrada */
       animation: fadeInDown 1s ease-out;
     }
 
@@ -52,6 +51,7 @@
         opacity: 0;
         transform: translateY(-50px);
       }
+
       to {
         opacity: 1;
         transform: translateY(0);
@@ -69,14 +69,13 @@
       padding: 2rem;
     }
 
-    /* Estilo para el número de pH */
+    /* Estilo para el número de pH y clasificación */
     h2 {
       font-size: 3rem;
-      color: #fff;
       font-weight: bold;
     }
 
-    /* Animación de carga personalizada (se usa dentro del modal de SweetAlert2) */
+    /* Animación de carga personalizada (para SweetAlert2) */
     .loader {
       border: 5px solid rgba(255, 255, 255, 0.2);
       border-left-color: #fff;
@@ -91,49 +90,75 @@
       0% {
         transform: rotate(0deg);
       }
+
       100% {
         transform: rotate(360deg);
       }
     }
 
-    /* Animación para actualización */
-    @keyframes pulse {
+    /* Animación para actualización (Agua Potable) */
+    @keyframes updatePulse {
       0% {
         transform: scale(1);
       }
+
       50% {
         transform: scale(1.1);
       }
+
       100% {
         transform: scale(1);
       }
     }
 
     .update-pulse {
-      animation: pulse 0.5s ease-in-out;
+      animation: updatePulse 0.5s ease-in-out;
     }
 
-    /* Animación de peligro: vibración */
-    .danger-animation {
-      animation: dangerShake 0.5s ease-in-out infinite;
-    }
-
+    /* Animación de peligro: vibración (usada para rangos con problemas) */
     @keyframes dangerShake {
       0% {
         transform: translateX(0);
       }
+
       25% {
         transform: translateX(-5px);
       }
+
       50% {
         transform: translateX(5px);
       }
+
       75% {
         transform: translateX(-5px);
       }
+
       100% {
         transform: translateX(0);
       }
+    }
+
+    .danger-animation {
+      animation: dangerShake 0.5s ease-in-out;
+    }
+
+    /* Animación sutil para Agua de Manglar */
+    @keyframes manglarPulse {
+      0% {
+        transform: scale(1);
+      }
+
+      50% {
+        transform: scale(1.05);
+      }
+
+      100% {
+        transform: scale(1);
+      }
+    }
+
+    .manglar-animation {
+      animation: manglarPulse 0.5s ease-in-out;
     }
 
     /* Ocultar scrollbar */
@@ -158,10 +183,10 @@
     </div>
     <!-- Título y contenido principal -->
     <div>
-      <h1 class="mb-4">Medidor de pH</h1>
+        <h1 style="font-size: 4rem;" class="mb-4">Medidor de pH</h1>
       <div class="card">
         <div class="card-body">
-          <!-- Aquí se mostrará el valor de pH en tiempo real -->
+          <!-- Aquí se mostrará el valor de pH en tiempo real junto con su clasificación -->
           <h2 id="phValue" class="display-4">Cargando...</h2>
         </div>
       </div>
@@ -174,6 +199,60 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
   <script>
+    // Función para clasificar el pH y retornar el dato de actualización
+    function classifyPH(ph) {
+      if (ph >= 0.0 && ph <= 3.9) {
+        return {
+          text: "Mayor Acidez",
+          color: "#ADFF2F", // Verde limón
+          icon: "☢",
+          animation: "danger-animation"
+        };
+      } else if (ph >= 4.0 && ph <= 5.9) {
+        return {
+          text: "Agua Contaminada/Gasolina",
+          color: "#FF4500", // Naranja rojizo
+          icon: "⚠️",
+          animation: "danger-animation"
+        };
+      } else if (ph >= 6.0 && ph <= 7.4) {
+        return {
+          text: "Agua de Manglar",
+          color: "#006400", // Verde fuerte
+          icon: "🌿",
+          animation: "manglar-animation"
+        };
+      } else if (ph >= 7.5 && ph <= 8.5) {
+        return {
+          text: "Agua Potable",
+          color: "#87CEEB", // Azul cielo
+          icon: "💧",
+          animation: "update-pulse"
+        };
+      } else if (ph >= 8.6 && ph <= 11.4) {
+        return {
+          text: "Ligeramente Alcalino",
+          color: "#FFA500", // Naranja
+          icon: "ℹ️",
+          animation: ""
+        };
+      } else if (ph >= 11.5 && ph <= 13.0) {
+        return {
+          text: "Cloro Doméstico",
+          color: "#FFFF00", // Amarillo
+          icon: "🧪",
+          animation: ""
+        };
+      } else {
+        return {
+          text: "",
+          color: "#fff",
+          icon: "",
+          animation: ""
+        };
+      }
+    }
+
     // Al cargarse el contenido, muestra el modal de carga de SweetAlert2
     document.addEventListener("DOMContentLoaded", function () {
       Swal.fire({
@@ -185,12 +264,11 @@
         color: '#fff',
         timer: 2000,
         didClose: () => {
-          // Al cerrar la animación de carga se muestra el contenedor principal
           document.getElementById("mainContent").style.display = "flex";
         }
       });
 
-      // Animación de actualización cada 2 segundos para el valor de pH
+      // Animación periódica adicional (ejemplo, para Agua Potable)
       setInterval(() => {
         const phElement = document.getElementById("phValue");
         phElement.classList.add("update-pulse");
@@ -214,38 +292,35 @@
     // Inicializa Firebase
     firebase.initializeApp(firebaseConfig);
 
-    // Obtiene una referencia al servicio de Realtime Database
+    // Obtiene referencia a la base de datos en tiempo real
     const database = firebase.database();
-
-    // Referencia a la ruta donde se almacena el pH (ajusta la ruta si es necesario)
     const phRef = database.ref('/Sensores/ph');
 
-    // Escucha cambios en tiempo real y actualiza el contenido del elemento con id "phValue"
+    // Escucha cambios en tiempo real y actualiza el contenido
     phRef.on('value', (snapshot) => {
       const ph = snapshot.val();
       const phElement = document.getElementById('phValue');
-      // Definir rango seguro: entre 6.5 y 8.5 (puedes ajustar estos valores)
-      const safeMin = 6.5,
-        safeMax = 8.5;
 
       if (ph !== null) {
-        if (ph < safeMin || ph > safeMax) {
-          // Agua contaminada, se muestra el mensaje de peligro
-          phElement.innerText = `⚠️ ${ph} - Peligro: Agua contaminada`;
-          phElement.style.color = "#ff0000";
-          phElement.classList.add("danger-animation");
-        } else {
-          // Agua dentro del rango seguro
-          phElement.innerText = ph;
-          phElement.style.color = "#fff";
-          phElement.classList.remove("danger-animation");
+        // Obtiene la clasificación según el pH
+        const classification = classifyPH(ph);
+        // Actualiza el contenido: muestra el valor numérico y la clasificación con su ícono
+        phElement.innerHTML = `${ph} - ${classification.icon} ${classification.text}`;
+        phElement.style.color = classification.color;
+        // Limpia animaciones previas y aplica la nueva si se definió
+        phElement.classList.remove("danger-animation", "update-pulse", "manglar-animation");
+        if (classification.animation) {
+          phElement.classList.add(classification.animation);
+          setTimeout(() => {
+            phElement.classList.remove(classification.animation);
+          }, 500);
         }
       } else {
         phElement.innerText = "Sin datos";
+        phElement.style.color = "#fff";
       }
     });
   </script>
 </body>
 
 </html>
-
